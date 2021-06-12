@@ -1,89 +1,76 @@
-import { InMemoryUsersRepository } from "../../../users/repositories/in-memory/InMemoryUsersRepository";
-import { CreateUserUseCase } from "../../../users/useCases/createUser/CreateUserUseCase";
-import { InMemoryStatementsRepository } from "../../repositories/in-memory/InMemoryStatementsRepository";
-import { CreateStatementUseCase } from "../createStatement/CreateStatementUseCase";
-import { ICreateStatementDTO } from "../createStatement/ICreateStatementDTO";
+import { InMemoryStatementsRepository } from "@modules/statements/repositories/in-memory/InMemoryStatementsRepository";
+import { InMemoryUsersRepository } from "@modules/users/repositories/in-memory/InMemoryUsersRepository";
 import { GetStatementOperationError } from "./GetStatementOperationError";
-
 import { GetStatementOperationUseCase } from "./GetStatementOperationUseCase";
 
-let createUserUseCase: CreateUserUseCase;
-let createStatementUseCase: CreateStatementUseCase;
-let getStatementOperationUseCase: GetStatementOperationUseCase;
 let inMemoryUsersRepository: InMemoryUsersRepository;
 let inMemoryStatementsRepository: InMemoryStatementsRepository;
+let getStatementOperationUseCase: GetStatementOperationUseCase;
 
 enum OperationType {
   DEPOSIT = "deposit",
   WITHDRAW = "withdraw",
 }
 
-describe("GET Statement", () => {
+describe("GetStatementOperationUseCase", () => {
   beforeEach(() => {
     inMemoryUsersRepository = new InMemoryUsersRepository();
     inMemoryStatementsRepository = new InMemoryStatementsRepository();
-    createUserUseCase = new CreateUserUseCase(inMemoryUsersRepository);
-    createStatementUseCase = new CreateStatementUseCase(
-      inMemoryUsersRepository,
-      inMemoryStatementsRepository
-    );
     getStatementOperationUseCase = new GetStatementOperationUseCase(
       inMemoryUsersRepository,
       inMemoryStatementsRepository
     );
   });
 
-  it("should be able to get statement from user", async () => {
-    const userData = {
-      name: "Test Name",
-      email: "Test Email",
-      password: "Test Password",
-    };
+  it("should not be able to find statement from a nonexistent user", async () => {
+    expect(async () => {
+      const user_id = "nonexistent";
+      const statement_id = "nonexistent";
 
-    const user = await createUserUseCase.execute(userData);
+      await getStatementOperationUseCase.execute({
+        user_id,
+        statement_id,
+      });
+    }).rejects.toEqual(new GetStatementOperationError.UserNotFound());
+  });
 
-    const statement: ICreateStatementDTO = {
-      user_id: user.id,
-      type: OperationType.DEPOSIT,
-      amount: 100,
-      description: "depósito",
-    };
+  it("should not be able to find one statement", async () => {
+    expect(async () => {
+      const { id: user_id } = await inMemoryUsersRepository.create({
+        name: "Guilherme",
+        email: "guilherme@email.com.br",
+        password: "1234",
+      });
 
-    const statementCreated = await createStatementUseCase.execute(statement);
+      const statement_id = "nonexistent";
 
-    const statementOperation = await getStatementOperationUseCase.execute({
-      user_id: user.id,
-      statement_id: statementCreated.id,
+      await inMemoryStatementsRepository.findStatementOperation({
+        user_id,
+        statement_id,
+      });
+    }).rejects.toBeInstanceOf(GetStatementOperationError.StatementNotFound);
+  });
+
+  it("should be able to return one statement", async () => {
+    const { id: user_id } = await inMemoryUsersRepository.create({
+      name: "Guilherme",
+      email: "guilherme@email.com.br",
+      password: "1234",
     });
 
-    expect(statementOperation).toHaveProperty("id");
-    expect(statementOperation.id).toEqual(statementCreated.id);
-    expect(statementOperation).toHaveProperty("created_at");
-  });
+    const { id: statement_id } = await inMemoryStatementsRepository.create({
+      user_id,
+      description: "Test",
+      amount: 1000,
+      type: OperationType.DEPOSIT,
+    });
 
-  it("should NOT be able to get statement from a non-existing user", async () => {
-    await expect(
-      getStatementOperationUseCase.execute({
-        user_id: "userId",
-        statement_id: "statementId",
-      })
-    ).rejects.toEqual(new GetStatementOperationError.UserNotFound());
-  });
+    const statement = await getStatementOperationUseCase.execute({
+      user_id,
+      statement_id,
+    });
 
-  it("should NOT be able to get a non-existing statement from user", async () => {
-    const userData = {
-      name: "Test Name",
-      email: "Test Email",
-      password: "Test Password",
-    };
-
-    const user = await createUserUseCase.execute(userData);
-
-    await expect(
-      getStatementOperationUseCase.execute({
-        user_id: user.id,
-        statement_id: "statementId",
-      })
-    ).rejects.toEqual(new GetStatementOperationError.StatementNotFound());
+    expect(statement).toHaveProperty("id");
+    expect(statement.amount).toBe(1000);
   });
 });

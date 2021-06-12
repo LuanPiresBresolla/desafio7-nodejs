@@ -1,120 +1,41 @@
-import { BalanceMap } from "../../../../modules/statements/mappers/BalanceMap";
-import { InMemoryUsersRepository } from "../../../users/repositories/in-memory/InMemoryUsersRepository";
-import { CreateUserUseCase } from "../../../users/useCases/createUser/CreateUserUseCase";
-import { InMemoryStatementsRepository } from "../../repositories/in-memory/InMemoryStatementsRepository";
-import { CreateStatementUseCase } from "../createStatement/CreateStatementUseCase";
-import { ICreateStatementDTO } from "../createStatement/ICreateStatementDTO";
-import { CreateTransferUseCase } from "../createTransfer/CreateTransferUseCase";
-import { ICreateTransferDTO } from "../createTransfer/ICreateTransferDTO";
+import { InMemoryStatementsRepository } from "@modules/statements/repositories/in-memory/InMemoryStatementsRepository";
+import { InMemoryUsersRepository } from "@modules/users/repositories/in-memory/InMemoryUsersRepository";
 import { GetBalanceError } from "./GetBalanceError";
-
 import { GetBalanceUseCase } from "./GetBalanceUseCase";
 
-let createUserUseCase: CreateUserUseCase;
-let createStatementUseCase: CreateStatementUseCase;
-let createTransferUseCase: CreateTransferUseCase;
-let getBalanceUseCase: GetBalanceUseCase;
 let inMemoryUsersRepository: InMemoryUsersRepository;
 let inMemoryStatementsRepository: InMemoryStatementsRepository;
+let getBalanceUseCase: GetBalanceUseCase;
 
-enum OperationType {
-  DEPOSIT = "deposit",
-  WITHDRAW = "withdraw",
-  TRANSFER = "transfer",
-}
-
-describe("Balance", () => {
+describe("GetBalanceUseCase", () => {
   beforeEach(() => {
     inMemoryUsersRepository = new InMemoryUsersRepository();
     inMemoryStatementsRepository = new InMemoryStatementsRepository();
-    createUserUseCase = new CreateUserUseCase(inMemoryUsersRepository);
-
-    createStatementUseCase = new CreateStatementUseCase(
-      inMemoryUsersRepository,
-      inMemoryStatementsRepository
-    );
-
-    createTransferUseCase = new CreateTransferUseCase(
-      inMemoryUsersRepository,
-      inMemoryStatementsRepository
-    );
-
     getBalanceUseCase = new GetBalanceUseCase(
       inMemoryStatementsRepository,
       inMemoryUsersRepository
     );
   });
 
-  it("should be able to get user's balance", async () => {
-    const userData = {
-      name: "Test Name",
-      email: "Test Email",
-      password: "Test Password",
-    };
-
-    const user = await createUserUseCase.execute(userData);
-
-    const userBalance = await getBalanceUseCase.execute({ user_id: user.id });
-
-    expect(userBalance).toHaveProperty("balance");
-    expect(userBalance).toHaveProperty("statement");
+  it("should not be able to show balance an nonexistent user", async () => {
+    expect(async () => {
+      const user_id = "nonexistent";
+      await getBalanceUseCase.execute({ user_id });
+    }).rejects.toEqual(new GetBalanceError());
   });
 
-  it("should properly calculate the user's balance", async () => {
-    const userData1 = {
-      name: "Test Name",
-      email: "Test Email",
-      password: "Test Password",
-    };
+  it("should be able to show balance an user", async () => {
+    const { id: user_id } = await inMemoryUsersRepository.create({
+      name: "Guilherme",
+      email: "guilherme@email.com.br",
+      password: "1234",
+    });
 
-    const userData2 = {
-      name: "Test Name 2",
-      email: "Test Email 2",
-      password: "Test Password 2",
-    };
+    const balanceUser = await getBalanceUseCase.execute({
+      user_id,
+    });
 
-    const user1 = await createUserUseCase.execute(userData1);
-    const user2 = await createUserUseCase.execute(userData2);
-
-    const statement1: ICreateStatementDTO = {
-      user_id: user1.id,
-      type: OperationType.DEPOSIT,
-      amount: 500,
-      description: "depósito",
-    };
-
-    const statement2: ICreateStatementDTO = {
-      user_id: user2.id,
-      type: OperationType.DEPOSIT,
-      amount: 500,
-      description: "depósito",
-    };
-
-    await createStatementUseCase.execute(statement1);
-    await createStatementUseCase.execute(statement2);
-
-    const transfer: ICreateTransferDTO = {
-      receiver_id: user1.id,
-      user_id: user2.id,
-      amount: 100,
-      description: "Descrição da transferência",
-    };
-
-    await createTransferUseCase.execute(transfer);
-
-    const userBalance1 = await getBalanceUseCase.execute({ user_id: user1.id });
-    const userBalance2 = await getBalanceUseCase.execute({ user_id: user2.id });
-
-    expect(userBalance1).toHaveProperty("balance");
-    expect(userBalance1).toHaveProperty("statement");
-    expect(userBalance1.statement.length).toEqual(2);
-    expect(userBalance1.balance).toEqual(600);
-    expect(userBalance2.balance).toEqual(400);
-  });
-
-  it("should not be able to get a non-existing user balance", async () => {
-    await expect(
-      getBalanceUseCase.execute({ user_id: "user.id " })
-    ).rejects.toEqual(new GetBalanceError());
+    expect(balanceUser.balance).toBe(0);
+    expect(balanceUser.statement.length).toBe(0);
   });
 });

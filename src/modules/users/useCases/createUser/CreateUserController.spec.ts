@@ -1,9 +1,7 @@
 import request from "supertest";
-
-import { Connection } from "typeorm";
+import { Connection, createConnection } from "typeorm";
 
 import { app } from "../../../../app";
-import createConnection from "../../../../database";
 
 let connection: Connection;
 
@@ -19,31 +17,15 @@ describe("Create User", () => {
   });
 
   it("should be able to create a new user", async () => {
-    const response = await request(app).post("/api/v1/users").send({
-      name: "Supertest",
-      email: "email@supertest.com",
-      password: "password",
-    });
+    const user = {
+      name: "Guilherme",
+      email: "guilherme@email.com.br",
+      password: "1234",
+    };
+
+    const response = await request(app).post("/api/v1/users").send(user);
 
     expect(response.status).toBe(201);
-  });
-
-  it("should not be able to create a new user with an already exists email", async () => {
-    await request(app).post("/api/v1/users").send({
-      name: "Supertest",
-      email: "email@supertest.com",
-      password: "password",
-    });
-
-    const response = await request(app).post("/api/v1/users").send({
-      name: "Supertest",
-      email: "email@supertest.com",
-      password: "password",
-    });
-
-    const { message } = response.body;
-
-    expect(response.status).toBe(400);
-    expect(message).toEqual("User already exists");
+    expect(response.body).toStrictEqual({});
   });
 });

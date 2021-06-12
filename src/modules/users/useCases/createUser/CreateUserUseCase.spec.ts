@@ -1,44 +1,38 @@
-import { InMemoryUsersRepository } from "../../repositories/in-memory/InMemoryUsersRepository";
+import { InMemoryUsersRepository } from "@modules/users/repositories/in-memory/InMemoryUsersRepository";
 import { CreateUserError } from "./CreateUserError";
-
 import { CreateUserUseCase } from "./CreateUserUseCase";
 
-let createUserUseCase: CreateUserUseCase;
 let inMemoryUsersRepository: InMemoryUsersRepository;
+let createUserUseCase: CreateUserUseCase;
 
-describe("Create User", () => {
+describe("CreateUserUseCase", () => {
   beforeEach(() => {
     inMemoryUsersRepository = new InMemoryUsersRepository();
     createUserUseCase = new CreateUserUseCase(inMemoryUsersRepository);
   });
 
   it("should be able to create a new user", async () => {
-    const user = {
-      name: "Test Name",
-      email: "Test Email",
-      password: "Test Password",
-    };
-
-    await createUserUseCase.execute(user);
-
-    const userCreated = await inMemoryUsersRepository.findByEmail(
-      user.email
-    );
-
-    expect(userCreated).toHaveProperty("id");
+    const user = await createUserUseCase.execute({
+      name: "Guilherme",
+      email: "guilherme@email.com.br",
+      password: "1234",
+    });
+    expect(user).toHaveProperty("id");
   });
 
-  it("should not be able to create a new user with an already exists email", async () => {
-    const user = {
-      name: "Test Name",
-      email: "Test Email",
-      password: "Test Password",
-    };
+  it("should not be able to create a new user with email already registered", async () => {
+    expect(async () => {
+      const user = await createUserUseCase.execute({
+        name: "Guilherme",
+        email: "guilherme@email.com.br",
+        password: "1234",
+      });
 
-    await createUserUseCase.execute(user);
-
-    await expect(createUserUseCase.execute(user)).rejects.toEqual(
-      new CreateUserError()
-    );
+      await createUserUseCase.execute({
+        name: user.name,
+        email: user.email,
+        password: user.password,
+      });
+    }).rejects.toEqual(new CreateUserError());
   });
 });
