@@ -1,47 +1,44 @@
-import { AppError } from "../../../../shared/errors/AppError";
 import { InMemoryUsersRepository } from "../../repositories/in-memory/InMemoryUsersRepository";
+import { CreateUserError } from "./CreateUserError";
 
 import { CreateUserUseCase } from "./CreateUserUseCase";
 
-let inMemoryUserRepository: InMemoryUsersRepository;
 let createUserUseCase: CreateUserUseCase;
+let inMemoryUsersRepository: InMemoryUsersRepository;
 
-describe("Create a new User", () =>{
+describe("Create User", () => {
+  beforeEach(() => {
+    inMemoryUsersRepository = new InMemoryUsersRepository();
+    createUserUseCase = new CreateUserUseCase(inMemoryUsersRepository);
+  });
 
-      beforeEach(() => {
-        inMemoryUserRepository = new InMemoryUsersRepository();
-        createUserUseCase = new CreateUserUseCase(inMemoryUserRepository);
+  it("should be able to create a new user", async () => {
+    const user = {
+      name: "Test Name",
+      email: "Test Email",
+      password: "Test Password",
+    };
 
+    await createUserUseCase.execute(user);
 
-      });
+    const userCreated = await inMemoryUsersRepository.findByEmail(
+      user.email
+    );
 
-      it("Should be to create a new user", async () => {
+    expect(userCreated).toHaveProperty("id");
+  });
 
-        const user = await createUserUseCase.execute({
-          name: "New User",
-          email: "newuser@test.com",
-          password: "1234",
-        });
+  it("should not be able to create a new user with an already exists email", async () => {
+    const user = {
+      name: "Test Name",
+      email: "Test Email",
+      password: "Test Password",
+    };
 
-        expect(user).toHaveProperty('id');
-      });
+    await createUserUseCase.execute(user);
 
-      it("Should not be to create a new user with a email exist ", async () => {
-
-         expect(async () => {
-          await createUserUseCase.execute({
-            name: "New User",
-            email: "newuser@test.com",
-            password: "1234",
-          });
-
-          await createUserUseCase.execute({
-            name: "User Joe",
-            email: "newuser@test.com",
-            password: "54321",
-          });
-
-         }).rejects.toBeInstanceOf(AppError);
-
-      });
+    await expect(createUserUseCase.execute(user)).rejects.toEqual(
+      new CreateUserError()
+    );
+  });
 });

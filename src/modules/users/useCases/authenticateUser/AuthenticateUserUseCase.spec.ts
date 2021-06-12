@@ -1,72 +1,69 @@
 import { InMemoryUsersRepository } from "../../repositories/in-memory/InMemoryUsersRepository";
-import { ICreateUserDTO } from "../createUser/ICreateUserDTO";
-import {AuthenticateUserUseCase} from "./AuthenticateUserUseCase";
-import {CreateUserUseCase} from "../createUser/CreateUserUseCase";
 import { IncorrectEmailOrPasswordError } from "./IncorrectEmailOrPasswordError";
 
-let inMemoryUsersRepository: InMemoryUsersRepository;
-let createUserUseCase: CreateUserUseCase;
-let authenticateUserCase: AuthenticateUserUseCase;
+import { AuthenticateUserUseCase } from "./AuthenticateUserUseCase";
+import { CreateUserUseCase } from "../createUser/CreateUserUseCase";
 
+let authenticateUserUseCase: AuthenticateUserUseCase;
+let createUserUseCase: CreateUserUseCase;
+let inMemoryUsersRepository: InMemoryUsersRepository;
 
 describe("Authenticate User", () => {
+  beforeEach(() => {
+    inMemoryUsersRepository = new InMemoryUsersRepository();
+    authenticateUserUseCase = new AuthenticateUserUseCase(
+      inMemoryUsersRepository
+    );
+    createUserUseCase = new CreateUserUseCase(inMemoryUsersRepository);
+  });
 
+  it("should be able to authenticate an existing user", async () => {
+    const userData = {
+      name: "Test Name",
+      email: "Test Email",
+      password: "Test Password",
+    };
 
-      beforeEach(() => {
-          inMemoryUsersRepository = new InMemoryUsersRepository();
-          createUserUseCase = new CreateUserUseCase(inMemoryUsersRepository);
-          authenticateUserCase = new AuthenticateUserUseCase(inMemoryUsersRepository);
-      });
+    await createUserUseCase.execute(userData);
 
+    const { user, token } = await authenticateUserUseCase.execute({
+      email: userData.email,
+      password: userData.password,
+    });
 
-      it("should be able to authenticate an user", async () => {
-        const user: ICreateUserDTO = {
-              name: "New Noob",
-              email: "noob@test.com",
-              password: "1234",
-        };
+    expect(user).toHaveProperty("id");
+    expect(token).not.toBeNull();
+  });
 
-        await createUserUseCase.execute(user);
+  it("should not be able to authenticate an no-existing user", async () => {
+    const userData = {
+      name: "Test Name",
+      email: "Test Email",
+      password: "Test Password",
+    };
 
-        const response = await authenticateUserCase.execute({
-          email: user.email,
-          password: user.password,
-        });
+    await expect(
+      authenticateUserUseCase.execute({
+        email: userData.email,
+        password: userData.password,
+      })
+    ).rejects.toEqual(new IncorrectEmailOrPasswordError());
+  });
 
-        expect(response).toHaveProperty('token');
-      });
+  it("should not be able to authenticate a user with wrong password", async () => {
+    const userData = {
+      name: "Test Name",
+      email: "Test Email",
+      password: "Test Password",
+    };
 
-      it("should not be able to authenticate an user with an incorrect email", async () => {
-        expect(async ()=> {
-          const user: ICreateUserDTO = {
-            name: "New Noob",
-            email: "noob@test.com",
-            password: "1234",
-      };
+    await createUserUseCase.execute(userData);
 
-      await createUserUseCase.execute(user);
-
-      await authenticateUserCase.execute({
-        email: "email test",
-        password: user.password,
-      });
-        }).rejects.toBeInstanceOf(IncorrectEmailOrPasswordError);
-      });
-
-      it("should not be able to authenticate an user with an incorrect password", async () => {
-        expect(async ()=> {
-          const user: ICreateUserDTO = {
-            name: "New Noob",
-            email: "noob@test.com",
-            password: "1234",
-      };
-
-      await createUserUseCase.execute(user);
-
-      await authenticateUserCase.execute({
-        email: user.email,
-        password: "password test",
-      });
-        }).rejects.toBeInstanceOf(IncorrectEmailOrPasswordError);
-      });
+    await expect(
+      authenticateUserUseCase.execute({
+        email: userData.email,
+        password: "wrong password",
+      })
+    ).rejects.toEqual(new IncorrectEmailOrPasswordError());
+  });
 });
